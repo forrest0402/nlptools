@@ -67,12 +67,6 @@ public class BPlusTree<K extends Comparable<? super K>, V> {
         return root.getValue(key);
     }
 
-
-
-    public V searchInWard(K key) {
-
-    }
-
     /**
      * Returns the values associated with the keys specified by the range:
      * {@code key1} and {@code key2}.
