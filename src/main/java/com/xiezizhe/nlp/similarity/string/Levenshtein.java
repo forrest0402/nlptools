@@ -1,4 +1,4 @@
-package forrest.algorithm.nlp.similarity.string;
+package com.xiezizhe.nlp.similarity.string;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

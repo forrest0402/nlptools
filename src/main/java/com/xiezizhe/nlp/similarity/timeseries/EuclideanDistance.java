@@ -31,12 +31,28 @@ public class EuclideanDistance<T> implements Similarity<T> {
      * @return
      */
     public double dist(List<T> T1, List<T> T2) {
-        if (T1.size() != T2.size())
+        if (T1.size() != T2.size()) {
             throw new IllegalArgumentException("T1 should be of the same length as T2");
+        }
+
         double dist = 0.0;
         for (int i = 0; i < T1.size(); ++i) {
-            dist += Math.sqrt(distFunc.apply(T1.get(i), T2.get(i)));
+            dist += distFunc.apply(T1.get(i), T2.get(i));
         }
-        return dist;
+        return Math.sqrt(dist);
     }
+
+    public static double dist(double[] T1, double[] T2) {
+        if (T1 == null || T2 == null || T1.length != T2.length) {
+            throw new IllegalArgumentException("T1 and T2 cannot be null values and T1 should be of the same length " +
+                    "as T2");
+        }
+
+        double dist = 0.0;
+        for (int i = 0; i < T1.length; i++) {
+            dist += (T1[i] - T2[i]) * (T1[i] - T2[i]);
+        }
+        return Math.sqrt(dist);
+    }
+
 }
