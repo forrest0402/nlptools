@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface Index {
 
-    void build(List<Entry> entries);
+    void build(List<Entry> entries, int k);
 
     List<Entry> top(Entry entry, int k);
 
