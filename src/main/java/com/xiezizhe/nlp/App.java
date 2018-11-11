@@ -1,29 +1,29 @@
 package com.xiezizhe.nlp;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.xiezizhe.nlp.config.AppConfig;
+import com.xiezizhe.nlp.config.WordEmbConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.stereotype.Service;
 
 /**
  * Hello world!
  */
+@Service
 public class App {
-    private static void f() {
-        int a = 0;
-        System.out.println(56 / a);
 
-    }
+    private static final Logger logger = LoggerFactory.getLogger(App.class);
+
+    private static final ApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class,
+            WordEmbConfig.class);
 
     public static void main(String[] args) {
-        List<String> list = new ArrayList<>();
-        list.add("1");
         try {
-            f();
+            context.getBean(IntentExtender.class).run();
         } catch (Exception e) {
-            Object ee = e.getStackTrace()[0];
+            logger.error("", e);
         }
-        Object[] array = list.toArray();
-        List<String> temp = list.stream().filter(c -> c.length() > 5).collect(Collectors.toList());
-        System.out.println("Hello World!");
     }
 }

@@ -1,3 +1,13 @@
 .idea/
 target/
 *.iml
+data/
+dict/
+logs/
+model/
+*.zip
+*.bak
+*.split
+*.xlsx
+.DS_Store
+META-INF/

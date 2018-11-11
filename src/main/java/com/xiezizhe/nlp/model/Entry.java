@@ -1,5 +1,6 @@
 package com.xiezizhe.nlp.model;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -7,9 +8,13 @@ import java.util.stream.Collectors;
  * Created by xiezizhe
  * Date: 2018/8/28 上午10:29
  */
-public class Entry {
+public class Entry<T> implements Serializable {
 
-    final double[] data;
+    private static final long serialVersionUID = 733521108316381015L;
+
+    final double[] representation;
+
+    final T data;
 
     /**
      * distant to the representative
@@ -21,16 +26,26 @@ public class Entry {
      */
     private double score;
 
-    public Entry(double[] data) {
+    public Entry(double[] representation, T data) {
+        this.representation = representation;
         this.data = data;
     }
 
-    public double[] get() {
+    public Entry(Entry<T> entry) {
+        this.representation = entry.getRepr().clone();
+        this.data = entry.getData();
+    }
+
+    public T getData() {
         return this.data;
     }
 
+    public double[] getRepr() {
+        return this.representation;
+    }
+
     public int length() {
-        return this.data.length;
+        return this.representation.length;
     }
 
     public double getDist() {
@@ -51,7 +66,10 @@ public class Entry {
 
     @Override
     public String toString() {
-        return "(" + Arrays.stream(data).mapToObj(String::valueOf).collect(Collectors.joining(" ")) + ")";
+        return "(" +
+                String.valueOf(data) + " " +
+                Arrays.stream(representation).mapToObj(String::valueOf).collect(Collectors.joining(" ")
+                ) + ")";
     }
 
     @Override
@@ -59,11 +77,11 @@ public class Entry {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Entry entry = (Entry) o;
-        return Arrays.equals(data, entry.data);
+        return Arrays.equals(representation, entry.representation);
     }
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(data);
+        return Arrays.hashCode(representation);
     }
 }

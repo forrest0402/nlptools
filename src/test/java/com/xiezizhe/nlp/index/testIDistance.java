@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * @author xiezizhe
@@ -22,27 +21,32 @@ public class testIDistance {
 
     @Test
     public void test() {
-        Index index = new iDistance();
+        Index<String> index = new iDistance<>();
 
-
-        List<Entry> entries = Arrays.asList(new Entry(new double[]{1, 1}),
-                new Entry(new double[]{1, 2}),
-                new Entry(new double[]{1, 3}),
-                new Entry(new double[]{4, 5}),
-                new Entry(new double[]{10, 20}),
-                new Entry(new double[]{10, 21}),
-                new Entry(new double[]{10, 30}),
-                new Entry(new double[]{9, 20}),
-                new Entry(new double[]{7, 20}),
-                new Entry(new double[]{4, 8}));
+        List<Entry<String>> entries = Arrays.asList(new Entry<>(new double[]{1, 1}, "1"),
+                new Entry<>(new double[]{1, 2}, "2"),
+                new Entry<>(new double[]{1, 3}, "3"),
+                new Entry<>(new double[]{4, 5}, "4"),
+                new Entry<>(new double[]{10, 20}, "5"),
+                new Entry<>(new double[]{10, 21}, "6"),
+                new Entry<>(new double[]{10, 30}, "7"),
+                new Entry<>(new double[]{9, 20}, "8"),
+                new Entry<>(new double[]{7, 20}, "9"),
+                new Entry<>(new double[]{4, 8}, "10"));
         int k = 2;
         index.build(entries, k);
 
-        Entry query = new Entry(new double[]{5, 5});
-        List<Entry> ans = index.top(query, 3);
+        Entry<String> query = new Entry<>(new double[]{5, 5}, null);
+        List<Entry<String>> ans = index.top(query, 3);
         for (Entry an : ans) {
-            System.out.print(Arrays.stream(an.get()).mapToObj(String::valueOf).collect(Collectors.joining(" ")));
-            System.out.println(" -> " + EuclideanDistance.dist(an.get(), query.get()));
+            System.out.print(an.toString());
+            System.out.println(" -> " + EuclideanDistance.dist(an.getRepr(), query.getRepr()));
         }
     }
+
+    @Test
+    public void efficiencyTest() {
+
+    }
+
 }

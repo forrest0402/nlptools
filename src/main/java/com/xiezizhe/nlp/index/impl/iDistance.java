@@ -8,15 +8,26 @@ import com.xiezizhe.nlp.similarity.timeseries.EuclideanDistance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.security.SecureRandom;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Random;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
  * Created by xiezizhe
  * Date: 2018/8/28 上午10:30
  */
-public class iDistance implements Index {
+public class iDistance<T> implements Index<T>, Serializable {
+
+    private static final long serialVersionUID = -1128021648697075434L;
 
     private static Logger logger = LoggerFactory.getLogger(iDistance.class);
 
@@ -24,7 +35,7 @@ public class iDistance implements Index {
 
     private static final double KMEANS_THRESHOLD = 1.0;
 
-    private static final int MAX_ROUNDS = 500;
+    private static final int MAX_ROUNDS = 100;
 
     private static ThreadLocal<Boolean> stopFlags = new ThreadLocal<>();
 
@@ -32,35 +43,41 @@ public class iDistance implements Index {
 
     private volatile boolean ready = false;
 
-
-    DistanceFunction<Double, Double> func = (e1, e2) -> (e1 - e2) * (e1 - e2);
-    private Similarity<Double> similarity = new EuclideanDistance<>(func);
+    private transient DistanceFunction<Double, Double> func = (e1, e2) -> (e1 - e2) * (e1 - e2);
+    private transient Similarity<Double> similarity = new EuclideanDistance<>(func);
 
     @Override
-    public synchronized void build(List<Entry> entries, int k) {
-        ready = false;
+    public synchronized void build(List<Entry<T>> entries, int k) {
+        if (ready) return;
+        logger.info("building index - {}", entries.size());
         if (k > entries.size()) throw new IllegalArgumentException("k is too large");
         this.group = kMeans(entries, k);
         if (logger.isDebugEnabled()) {
             this.group.show();
         }
         ready = true;
+        logger.info("building complete");
     }
 
     @Override
-    public List<Entry> top(Entry query, int k) {
+    public List<Entry<T>> top(Entry<T> query, int k) {
         return top(query, k, DEFAULT_DELTA);
     }
 
     @Override
-    public List<Entry> top(Entry query, int k, double deltaR) {
+    public List<Entry<T>> top(Entry<T> query, double threshold) {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    public List<Entry<T>> top(Entry<T> query, int k, double deltaR) {
         if (!this.ready || query == null) return null;
         if (k < 0 || deltaR < 0) throw new IllegalArgumentException("arguments must be positive");
         if (k > this.group.getCandidateNumber()) throw new IllegalArgumentException("k is too large");
 
         double r = 0;
         stopFlags.set(false);
-        PriorityQueue<Entry> answers = new PriorityQueue<>(Comparator.comparing(Entry::getScore).reversed());
+        PriorityQueue<Entry<T>> answers = new PriorityQueue<>(Comparator.comparing(Entry<T>::getScore).reversed());
         boolean[] visit = new boolean[this.group.length()];
         int[] lp = new int[this.group.length()];
         int[] rp = new int[this.group.length()];
@@ -73,7 +90,7 @@ public class iDistance implements Index {
         return answers.stream().sorted(Comparator.comparing(Entry::getScore)).collect(Collectors.toList());
     }
 
-    private void searchO(Entry query, double radius, PriorityQueue<Entry> answers,
+    private void searchO(Entry<T> query, double radius, PriorityQueue<Entry<T>> answers,
                          int k, boolean[] visit, int[] lp, int[] rp) {
 
         if (answers.size() == k && answers.peek().getDist() <= radius) {
@@ -82,7 +99,7 @@ public class iDistance implements Index {
 
         for (int i = 0; i < this.group.length(); i++) {
             Entry representative = this.group.getRepresentative(i);
-            double dist = dist(representative.get(), query.get());
+            double dist = dist(representative.getRepr(), query.getRepr());
 
             //group i has not been searched before
             if (!visit[i]) {
@@ -116,9 +133,9 @@ public class iDistance implements Index {
         return EuclideanDistance.dist(array1, array2);
     }
 
-    private int searchInward(int left, double dist, List<Entry> entries,
-                             Entry query, double radius, int k,
-                             PriorityQueue<Entry> answers) {
+    private int searchInward(int left, double dist, List<Entry<T>> entries,
+                             Entry<T> query, double radius, int k,
+                             PriorityQueue<Entry<T>> answers) {
         if (left == -1) {
             left = binarySearch(entries, dist);
             if (left == entries.size()) --left;
@@ -126,7 +143,7 @@ public class iDistance implements Index {
         // 0 position is representative
         if (left == 0 || left == entries.size()) return left;
 
-        double candidateDist = dist(entries.get(left).get(), query.get());
+        double candidateDist = dist(entries.get(left).getRepr(), query.getRepr());
         entries.get(left).setScore(candidateDist);
         answers.add(entries.get(left));
         if (answers.size() > k) {
@@ -138,16 +155,16 @@ public class iDistance implements Index {
         return left - 1;
     }
 
-    private int searchOutward(int right, double dist, List<Entry> entries,
-                              Entry query, double radius, int k,
-                              PriorityQueue<Entry> answers) {
+    private int searchOutward(int right, double dist, List<Entry<T>> entries,
+                              Entry<T> query, double radius, int k,
+                              PriorityQueue<Entry<T>> answers) {
         if (right == -1) {
             right = binarySearch(entries, dist) + 1;
         }
         //out of range
         if (right == 0 || right >= entries.size()) return entries.size();
 
-        double candidateDist = dist(entries.get(right).get(), query.get());
+        double candidateDist = dist(entries.get(right).getRepr(), query.getRepr());
         entries.get(right).setScore(candidateDist);
         answers.add(entries.get(right));
         if (answers.size() > k) {
@@ -160,7 +177,7 @@ public class iDistance implements Index {
     }
 
 
-    private int binarySearch(List<Entry> entries, double dist) {
+    private int binarySearch(List<Entry<T>> entries, double dist) {
         int left = 0, right = entries.size() - 1;
         while (left <= right) {
             int mid = left + (right - left) / 2;
@@ -174,19 +191,19 @@ public class iDistance implements Index {
         return left;
     }
 
-    private Group kMeans(List<Entry> entries, int k) {
+    private Group kMeans(List<Entry<T>> entries, int k) {
 
         Random random = new SecureRandom();
-        final Entry[] representatives = new Entry[k];
+        final Entry<T>[] representatives = new Entry[k];
         final double[] dMax = new double[k];
-        Map<Integer, List<Entry>> groupMap = null;
+        Map<Integer, List<Entry<T>>> groupMap = null;
 
         boolean[] chosenIdx = new boolean[entries.size()];
         for (int i = 0; i < representatives.length; i++) {
             int idx = random.nextInt(entries.size());
             while (chosenIdx[idx]) idx = random.nextInt(entries.size());
             chosenIdx[idx] = true;
-            representatives[i] = new Entry(entries.get(idx).get().clone());
+            representatives[i] = new Entry<>(entries.get(idx));
         }
 
         double preVariance = Double.MAX_VALUE;
@@ -196,17 +213,17 @@ public class iDistance implements Index {
             groupMap = new HashMap<>();
             double variance = 0.0;
 
-            for (Entry entry : entries) {
+            for (Entry<T> entry : entries) {
                 double minDist = Double.MAX_VALUE;
                 int groupIdx = 0;
                 for (int i = 0; i < representatives.length; i++) {
-                    double dist = dist(representatives[i].get(), entry.get());
+                    double dist = dist(representatives[i].getRepr(), entry.getRepr());
                     if (dist < minDist) {
                         minDist = dist;
                         groupIdx = i;
                     }
                 }
-                List<Entry> groupMembers = groupMap.get(groupIdx);
+                List<Entry<T>> groupMembers = groupMap.get(groupIdx);
                 if (groupMembers == null) {
                     groupMembers = new ArrayList<>();
                     groupMap.put(groupIdx, groupMembers);
@@ -216,11 +233,12 @@ public class iDistance implements Index {
             }
 
             for (int i = 0; i < representatives.length; i++) {
-                List<Entry> groupMembers = groupMap.get(i);
-                double[] representative = representatives[i].get();
+                List<Entry<T>> groupMembers = groupMap.get(i);
+                double[] representative = representatives[i].getRepr();
                 for (int j = 0; j < representative.length; j++) {
                     final int idx = j;
-                    representative[j] = groupMembers.stream().mapToDouble(e -> e.get()[idx]).average().getAsDouble();
+                    representative[j] = groupMembers.stream().mapToDouble(e -> e.getRepr()[idx]).average()
+                            .getAsDouble();
                 }
             }
 
@@ -230,12 +248,12 @@ public class iDistance implements Index {
         }
 
         groupMap.forEach((key, value) -> dMax[key] = value.stream()
-                .mapToDouble(e -> dist(e.get(), representatives[key].get()))
+                .mapToDouble(e -> dist(e.getRepr(), representatives[key].getRepr()))
                 .max()
                 .getAsDouble()
         );
 
-        List<List<Entry>> groups = new TreeMap<>(groupMap).values().stream().collect(Collectors.toList());
+        List<List<Entry<T>>> groups = new TreeMap<>(groupMap).values().stream().collect(Collectors.toList());
         for (int i = 0; i < representatives.length; i++) {
             groups.get(i).add(0, representatives[i]);
         }
@@ -244,18 +262,20 @@ public class iDistance implements Index {
     }
 
 
-    private class Group {
+    private class Group<T> implements Serializable {
 
-        private final List<List<Entry>> groups;
+        private static final long serialVersionUID = 5634363310910217267L;
 
-        private final Entry[] representatives;
+        private final List<List<Entry<T>>> groups;
+
+        private final Entry<T>[] representatives;
 
         private final double[] dMax;
 
 
         private final int candidateNumber;
 
-        private Group(List<List<Entry>> groups, Entry[] representatives, double[] dMax, int candidateNumber) {
+        private Group(List<List<Entry<T>>> groups, Entry<T>[] representatives, double[] dMax, int candidateNumber) {
             this.groups = groups;
             this.representatives = representatives;
             this.dMax = dMax;
@@ -266,12 +286,12 @@ public class iDistance implements Index {
             return this.groups.size();
         }
 
-        List<Entry> getGroup(int i) {
+        List<Entry<T>> getGroup(int i) {
             if (i < 0 || i > length()) return null;
             return Collections.unmodifiableList(this.groups.get(i));
         }
 
-        Entry getRepresentative(int i) {
+        Entry<T> getRepresentative(int i) {
             if (i < 0 || i > length()) return null;
             return this.representatives[i];
         }
@@ -289,7 +309,7 @@ public class iDistance implements Index {
 
         void show() {
             for (int i = 0; i < representatives.length; i++) {
-                Entry representative = representatives[i];
+                Entry<T> representative = representatives[i];
                 if (logger.isDebugEnabled()) {
                     logger.debug("{}: {}, [{}] ", i, representative.toString(), groups.get(i).toString());
                 }
