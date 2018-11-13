@@ -21,7 +21,7 @@ public class App {
 
     public static void main(String[] args) {
         try {
-            context.getBean(IntentExtender.class).run();
+            context.getBean(FaqCombinator2.class).run();
         } catch (Exception e) {
             logger.error("", e);
         }

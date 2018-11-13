@@ -11,3 +11,4 @@ model/
 *.xlsx
 .DS_Store
 META-INF/
+word.weights.sif.txt

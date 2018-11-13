@@ -238,7 +238,7 @@ public class ExcelUtils {
     /**
      * @param faq
      */
-    public void writeFaqToFile(Map<String, List<String>> faq, String filePath) throws IOException {
+    public void writeFaqToFile(Map<String, Set<String>> faq, String filePath) throws IOException {
 
         // 第一步，创建一个HSSFWorkbook，对应一个Excel文件
         XSSFWorkbook wb = new XSSFWorkbook();
@@ -265,21 +265,29 @@ public class ExcelUtils {
 
         //创建内容
         int rowIdx = 1;
-        for (Map.Entry<String, List<String>> entry : faq.entrySet()) {
-            row = sheet.createRow(rowIdx++);
-            row.createCell(CATEGORY_IDX).setCellValue(rowIdx);
-            row.createCell(PARENT_CATEGORY_IDX).setCellValue(0);
-            row.createCell(CATEGORY_NAME_IDX).setCellValue("默认");
-            row.createCell(STAND_QUES_IDX).setCellValue(entry.getKey());
-            if (entry.getValue() != null)
-                row.createCell(SIM_QUES_IDX)
-                        .setCellValue(new HashSet<>(entry.getValue()).stream().collect(Collectors.joining("\n")));
-            row.createCell(ANSWER_IDX).setCellValue("{\"text\":\"无答案啦\"}");
-            row.createCell(ANSWER_TYPE_IDX).setCellValue("1");
+        for (Map.Entry<String, Set<String>> entry : faq.entrySet()) {
+            List<String> questions = entry.getValue().stream().distinct().collect(Collectors.toList());
+            if (questions != null && questions.size() > 0) {
+                for (int j = 0; j < questions.size(); j += 500) {
+                    row = sheet.createRow(rowIdx);
+                    insertRow(row, rowIdx, entry.getKey());
+                    row.createCell(SIM_QUES_IDX)
+                            .setCellValue(new HashSet<>(questions.subList(j, Math.min(j + 500, questions.size())))
+                                    .stream().collect(Collectors.joining("\n")));
+                    ++rowIdx;
+                }
+            }
         }
-
         wb.write(new FileOutputStream(filePath));
+    }
 
+    private void insertRow(XSSFRow row, int rowIdx, String standQues) {
+        row.createCell(CATEGORY_IDX).setCellValue(rowIdx);
+        row.createCell(PARENT_CATEGORY_IDX).setCellValue(0);
+        row.createCell(CATEGORY_NAME_IDX).setCellValue("默认");
+        row.createCell(STAND_QUES_IDX).setCellValue(standQues);
+        row.createCell(ANSWER_IDX).setCellValue("{\"text\":\"无答案啦\"}");
+        row.createCell(ANSWER_TYPE_IDX).setCellValue("1");
     }
 
     /**
@@ -328,7 +336,8 @@ public class ExcelUtils {
      */
     public Map<String, Set<String>> trimFAQFile(String[][] excelFile, boolean filter) {
         Map<String, String> duplicateSimSentence = new HashMap<>();
-        Set<String> stopSentence = new HashSet<>(Arrays.asList(environment.getProperty("stop.sentence").split(",")));
+        Set<String> stopSentence = new HashSet<>(Arrays.asList(environment.getProperty("stop.sentence", "")
+                .split(",")));
         Map<String, Set<String>> ans = new HashMap<>();
         for (int i = 0; i < excelFile.length; ++i) {
             String standQuestion = trimSentence(excelFile[i][STAND_QUES_IDX]);

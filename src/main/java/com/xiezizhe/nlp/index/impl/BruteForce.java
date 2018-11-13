@@ -11,6 +11,8 @@ import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
 /**
+ * Thread safe
+ * <p>
  * Created by xiezizhe
  * Date: 2018/11/5 9:22 PM
  */
@@ -27,8 +29,9 @@ public class BruteForce<T> implements Index<T> {
     public List<Entry<T>> top(Entry<T> entry, int k) {
         PriorityQueue<Entry<T>> results = new PriorityQueue<>(Comparator.comparing(Entry::getScore));
         for (Entry<T> candidate : entries) {
-            candidate.setScore(NlpUtils.cosine(entry.getRepr(), candidate.getRepr()));
-            results.add(candidate);
+            Entry<T> candidateEntry = new Entry<>(candidate.getRepr(), candidate.getData());
+            candidateEntry.setScore(NlpUtils.cosine(entry.getRepr(), candidate.getRepr()));
+            results.add(candidateEntry);
             if (results.size() == k)
                 results.poll();
         }
@@ -50,14 +53,16 @@ public class BruteForce<T> implements Index<T> {
             return new ArrayList<>();
         }
 
-        PriorityQueue<Entry<T>> results = new PriorityQueue<>(Comparator.comparing(Entry::getScore));
+        List<Entry<T>> results = new ArrayList<>();
         for (Entry<T> candidate : entries) {
             double score = NlpUtils.cosine(entry.getRepr(), candidate.getRepr());
             if (score < threshold) continue;
-            candidate.setScore(score);
-            results.add(candidate);
+            Entry<T> candidateEntry = new Entry<>(candidate.getRepr(), candidate.getData());
+            candidateEntry.setScore(score);
+            results.add(candidateEntry);
         }
-        return results.stream().sorted(Comparator.comparing(Entry::getScore)).collect(Collectors.toList());
+        results.sort((e1, e2) -> Double.compare(e2.getScore(), e1.getScore()));
+        return results;
     }
 
     @Override

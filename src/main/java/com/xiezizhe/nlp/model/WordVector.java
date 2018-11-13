@@ -47,7 +47,7 @@ public class WordVector {
                     vec[i] = Double.parseDouble(array[i + 1]);
                 }
                 wordEmb.put(array[0], vec);
-                break;
+//                break;
             }
         } catch (IOException e) {
             logger.error("failed to load {}", fileName, e);

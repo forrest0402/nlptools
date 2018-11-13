@@ -21,9 +21,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 /**
+ * 把几个faq excel合并起来，合并的时候把相似的问题合并在一起
+ * <p>
  * Created by xiezizhe
  * Date: 2018/11/7 3:02 PM
  */
@@ -44,11 +52,15 @@ public class FaqCombinator {
 
     public void run() throws IOException {
         String[] faqExcelFiles = environment.getProperty("faq.sources").split(",");
-        Map<String, List<String>> faqs = new HashMap<>();
+        Map<String, List<String>> faqs = new ConcurrentHashMap<>();
         for (String faqExcelFile : faqExcelFiles) {
-            faqs.putAll(excelUtils.getFaq(PREFIX + faqExcelFile));
+            Map<String, List<String>> curFaq = excelUtils.getFaq(PREFIX + faqExcelFile)
+                    .entrySet().stream().filter(e -> e.getValue().size() > 5)
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            faqs.putAll(curFaq);
         }
 
+        // simple combine
         Map<String, String> queryToFaq = new HashMap<>();
         for (String key : faqs.keySet()) {
             faqs.put(key, faqs.get(key).stream().distinct().filter(c -> c.length() > 2).collect(Collectors.toList()));
@@ -61,9 +73,6 @@ public class FaqCombinator {
             }
             faqs.get(key).removeAll(duplicateQueries);
         }
-
-        faqs = faqs.entrySet().stream().filter(e -> e.getValue().size() > 5)
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         logger.info("faq size: {}", faqs.size());
         logger.info("start to remove similar sentences");
@@ -88,29 +97,56 @@ public class FaqCombinator {
         index.build(entries, -1);
 
         logger.info("3. filter faq");
-        Map<String, List<String>> finalFaq = new HashMap<>();
-        faqs.remove(null);
+        Map<String, List<String>> finalFaq = new ConcurrentHashMap<>();
+        faqs.remove("");
         List<String> keys = new ArrayList<>(faqs.keySet());
+        ExecutorService threadPool = new ThreadPoolExecutor(5, 5, 60000,
+                TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+        ReentrantLock lock = new ReentrantLock();
         try (ProgressBar pb = new ProgressBar("Filtering faqs", faqs.size())) {
             for (String key : keys) {
-                if (!faqs.containsKey(key)) continue;
-                List<String> simQuestions = faqs.get(key);
-                int toIndex = Math.min(simQuestions.size(), 20);
-                Map<String, List<String>> candidates = batchQuery(key, simQuestions.subList(0, toIndex),
-                        index, 0.93, queryToFaq);
-
-                finalFaq.put(key, simQuestions);
-                for (Map.Entry<String, List<String>> e : candidates.entrySet()) {
-                    if (finalFaq.containsKey(e.getKey()) || !faqs.containsKey(e.getKey())) continue;
-                    int threshold = faqs.containsKey(e.getKey()) ? faqs.get(e.getKey()).size() / 2 : Integer.MAX_VALUE;
-                    if (e.getValue().size() > threshold) {
-                        finalFaq.get(key).addAll(faqs.get(e.getKey()));
-                        faqs.remove(e.getKey());
+                threadPool.execute(() -> {
+                    boolean flag = true;
+                    try {
+                        lock.lock();
+                        flag = faqs.containsKey(key);
+                    } finally {
+                        lock.unlock();
                     }
-                }
-                pb.step();
+
+                    if (!flag) {
+                        List<String> simQuestions = faqs.get(key);
+//                      int toIndex = Math.min(simQuestions.size(), 20);
+                        int toIndex = simQuestions.size();
+                        Map<String, List<String>> candidates = batchQuery(key, simQuestions.subList(0, toIndex),
+                                index, 0.93, queryToFaq);
+                        try {
+                            lock.lock();
+                            finalFaq.put(key, simQuestions);
+                            for (Map.Entry<String, List<String>> e : candidates.entrySet()) {
+                                if (finalFaq.containsKey(e.getKey()) || !faqs.containsKey(e.getKey())) continue;
+                                int threshold = faqs.containsKey(e.getKey()) ? faqs.get(e.getKey()).size() / 2 : Integer
+                                        .MAX_VALUE;
+                                if (e.getValue().size() > threshold) {
+                                    finalFaq.get(key).addAll(faqs.get(e.getKey()));
+                                    faqs.remove(e.getKey());
+                                }
+                            }
+                        } finally {
+                            lock.unlock();
+                        }
+                        pb.step();
+                    }
+                });
             }
         }
+        threadPool.shutdown();
+        try {
+            threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            logger.error("", e);
+        }
+
         logger.info("final faq size: {}", finalFaq.size());
         String filePath = String.format("transfer_faq_%s_%d.xlsx", new SimpleDateFormat("yyyymmdd")
                 .format(System.currentTimeMillis()), finalFaq.size());
