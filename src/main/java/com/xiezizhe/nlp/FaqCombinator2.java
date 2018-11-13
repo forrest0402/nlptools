@@ -117,7 +117,7 @@ public class FaqCombinator2 {
         Map<String, Set<String>> finalFaq = new ConcurrentHashMap<>();
         Set<String> removedFaqs = new HashSet<>();
         List<String> keys = new ArrayList<>(faqs.keySet());
-        ExecutorService threadPool = new ThreadPoolExecutor(100, 100, 60000,
+        ExecutorService threadPool = new ThreadPoolExecutor(10, 10, 60000,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
         ReentrantLock lock = new ReentrantLock();
         AtomicInteger process = new AtomicInteger();
@@ -134,7 +134,7 @@ public class FaqCombinator2 {
                         lock.lock();
                         if (!removedFaqs.contains(key)) {
                             for (Map.Entry<String, Set<String>> e : candidates.entrySet()) {
-                                if (finalFaq.containsKey(e.getKey())) continue;
+                                if (finalFaq.containsKey(e.getKey())|| removedFaqs.contains(e.getKey())) continue;
                                 int threshold = faqs.containsKey(e.getKey()) ?
                                         (int) (faqs.get(e.getKey()).size() * 0.5) : Integer.MAX_VALUE;
                                 // combine faqs.get(e.getKey()) and simQuestions
