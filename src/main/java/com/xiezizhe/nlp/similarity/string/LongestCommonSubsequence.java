@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * considers the similarity between two strings is based on the length of contiguous chain of characters that exist
+ * considers the similarity between two strings is based on the getDimension of contiguous chain of characters that exist
  * in both strings.
  *
  * @author forrest0402

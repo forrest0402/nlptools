@@ -112,12 +112,11 @@ public class FaqCombinator2 {
                     corpus.get(i).stream().collect(Collectors.joining(""))));
         }
         index.build(entries, -1);
-
         logger.info("3. filter faq");
         Map<String, Set<String>> finalFaq = new ConcurrentHashMap<>();
         Set<String> removedFaqs = new HashSet<>();
         List<String> keys = new ArrayList<>(faqs.keySet());
-        ExecutorService threadPool = new ThreadPoolExecutor(10, 10, 60000,
+        ExecutorService threadPool = new ThreadPoolExecutor(20, 20, 60000,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
         ReentrantLock lock = new ReentrantLock();
         AtomicInteger process = new AtomicInteger();
@@ -125,35 +124,38 @@ public class FaqCombinator2 {
             for (String key : keys) {
                 threadPool.execute(() -> {
                     Set<String> simQuestions = new HashSet<>(faqs.get(key));
-                    int toIndex = Math.min(simQuestions.size(), 50);
+                    if (simQuestions != null && simQuestions.size() <= 500) {
+                        int toIndex = Math.min(simQuestions.size(), 50);
 //                        int toIndex = simQuestions.size();
-                    Map<String, Set<String>> candidates = batchQuery(key,
-                            new ArrayList<>(simQuestions).subList(0, toIndex),
-                            index, 0.93, queryToStd);
-                    try {
-                        lock.lock();
-                        if (!removedFaqs.contains(key)) {
-                            for (Map.Entry<String, Set<String>> e : candidates.entrySet()) {
-                                if (finalFaq.containsKey(e.getKey())|| removedFaqs.contains(e.getKey())) continue;
-                                int threshold = faqs.containsKey(e.getKey()) ?
-                                        (int) (faqs.get(e.getKey()).size() * 0.5) : Integer.MAX_VALUE;
-                                // combine faqs.get(e.getKey()) and simQuestions
-                                if (e.getValue().size() > threshold) {
-                                    removedFaqs.add(e.getKey());
-                                    simQuestions.addAll(faqs.get(e.getKey()));
+                        Map<String, Set<String>> candidates = batchQuery(key,
+                                new ArrayList<>(simQuestions).subList(0, toIndex),
+                                index, 0.75, queryToStd);
+                        try {
+                            lock.lock();
+                            if (!removedFaqs.contains(key)) {
+                                for (Map.Entry<String, Set<String>> e : candidates.entrySet()) {
+                                    if (finalFaq.containsKey(e.getKey()) || removedFaqs.contains(e.getKey()))
+                                        continue;
+                                    int threshold = faqs.containsKey(e.getKey()) ?
+                                            (int) (faqs.get(e.getKey()).size() * 0.1) : Integer.MAX_VALUE;
+                                    // combine faqs.get(e.getKey()) and simQuestions
+                                    if (e.getValue().size() > threshold) {
+                                        removedFaqs.add(e.getKey());
+                                        simQuestions.addAll(faqs.get(e.getKey()));
+                                        System.out.println("");
+                                        logger.info("combine {} and {}, {} has {} similar questions", key, e.getKey(),
+                                                key, simQuestions.size());
+                                    }
+                                }
+                                finalFaq.put(key, simQuestions);
+                                if (simQuestions.size() > 1000) {
                                     System.out.println("");
-                                    logger.info("combine {} and {}, {} has {} similar questions", key, e.getKey(),
-                                            key, simQuestions.size());
+                                    logger.error("{} has {} similar questions", key, simQuestions.size());
                                 }
                             }
-                            finalFaq.put(key, simQuestions);
-                            if (simQuestions.size() > 1000) {
-                                System.out.println("");
-                                logger.error("{} has {} similar questions", key, simQuestions.size());
-                            }
+                        } finally {
+                            lock.unlock();
                         }
-                    } finally {
-                        lock.unlock();
                     }
                     pb.step();
                     progressPercentage(process.getAndIncrement(), keys.size());
@@ -168,7 +170,7 @@ public class FaqCombinator2 {
         }
 
         logger.info("final faq size: {}", finalFaq.size());
-        String filePath = String.format("transfer_faq_%s_%d.xlsx", new SimpleDateFormat("yyyymmdd")
+        String filePath = String.format("transfer_faq_%s_%d.xlsx", new SimpleDateFormat("yyyyMMdd")
                 .format(System.currentTimeMillis()), finalFaq.size());
         excelUtils.writeFaqToFile(finalFaq, filePath);
         if (!isValidFaq(finalFaq)) {
@@ -223,6 +225,9 @@ public class FaqCombinator2 {
             results.addAll(result.stream().map(c -> c.getData()).collect(Collectors.toList()));
             if (result.size() > 1000) {
                 System.out.println("impossible");
+                index.top(new Entry<>(simQuesEmb.getRow(i), query.get(i)), threshold)
+                        .stream().filter(e -> !standardQuestion.equals(queryToFaq.get(e.getData())))
+                        .collect(Collectors.toList());
             }
         }
         Map<String, Set<String>> resMap = new HashMap<>();

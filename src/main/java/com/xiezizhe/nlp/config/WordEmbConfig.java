@@ -25,14 +25,14 @@ public class WordEmbConfig {
     @Autowired
     ApplicationContext context;
 
-    @Bean
-    @Qualifier("tencent")
-    public WordVector getTencentWordEmb() {
-        String fileName = environment.getProperty("tencent.emb.path", "model/tencent.vec");
-        WordVector vector = new WordVector(fileName);
-        vector.init(fileName);
-        return vector;
-    }
+//    @Bean
+//    @Qualifier("tencent")
+//    public WordVector getTencentWordEmb() {
+//        String fileName = environment.getProperty("tencent.emb.path", "model/tencent.vec");
+//        WordVector vector = new WordVector(fileName);
+//        vector.init(fileName);
+//        return vector;
+//    }
 
     @Bean
     @Qualifier("256")
@@ -43,12 +43,12 @@ public class WordEmbConfig {
         return vector;
     }
 
-    @Bean
-    @Qualifier("128")
-    public WordVector getWordEmb2() {
-        String fileName = environment.getProperty("general2.emb.path", "model/wordvec.vec");
-        WordVector vector = new WordVector(fileName);
-        vector.init(fileName);
-        return vector;
-    }
+//    @Bean
+//    @Qualifier("128")
+//    public WordVector getWordEmb2() {
+//        String fileName = environment.getProperty("general2.emb.path", "model/wordvec.vec");
+//        WordVector vector = new WordVector(fileName);
+//        vector.init(fileName);
+//        return vector;
+//    }
 }

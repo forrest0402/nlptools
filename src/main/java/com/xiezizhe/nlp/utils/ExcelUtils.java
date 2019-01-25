@@ -74,12 +74,12 @@ public class ExcelUtils {
                     "{\"answer\":{\"text\":\"欢迎关注微信公众号njyh\"},\"type\":1,\"channel\":\"微信\"}],选填)",
             "生效时间(格式如：2000-01-01 00:00:00,选填)"};
 
-    public Map<String, List<String>> getFaq(String fileName) throws IOException {
+    public Map<String, Set<String>> getFaq(String fileName) throws IOException {
         String[][] excelFile = getData(fileName, 1);
-        Map<String, List<String>> faqs = new HashMap<>();
+        Map<String, Set<String>> faqs = new HashMap<>();
         for (int i = 0; i < excelFile.length; i++) {
             String[] row = excelFile[i];
-            faqs.putIfAbsent(row[STAND_QUES_IDX], new ArrayList<>());
+            faqs.putIfAbsent(row[STAND_QUES_IDX], new HashSet<>());
             String[] simQuestions = excelFile[i][SIM_QUES_IDX].split("\n");
             faqs.get(row[STAND_QUES_IDX]).addAll(Arrays.asList(simQuestions));
         }

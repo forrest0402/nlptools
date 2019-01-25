@@ -1,7 +1,6 @@
 package com.xiezizhe.nlp.embedding;
 
 import com.xiezizhe.nlp.model.WordVector;
-import com.xiezizhe.nlp.utils.NlpUtils;
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
@@ -36,16 +35,16 @@ public class PowerMeanEmb {
     @Autowired
     private ApplicationContext applicationContext;
 
+//    @Autowired
+//    @Qualifier("256")
+//    private WordVector wordVectors1;
+//
+//    @Autowired
+//    @Qualifier("tencent")
+//    private WordVector wordVectors2;
+
     @Autowired
     @Qualifier("256")
-    private WordVector wordVectors1;
-
-    @Autowired
-    @Qualifier("tencent")
-    private WordVector wordVectors2;
-
-    @Autowired
-    @Qualifier("128")
     private WordVector wordVectors3;
 
 
@@ -95,6 +94,68 @@ public class PowerMeanEmb {
      * @param sentences
      * @return
      */
+//    public RealMatrix getEnhancedEmbedding(List<List<String>> sentences) {
+//        if (!loadComplete) {
+//            throw new IllegalStateException("Sentence Embedding isn't initialized well");
+//        }
+//
+//        if (sentences == null) {
+//            return null;
+//        }
+//
+//        int dimension = wordVectors1.getDimension() + wordVectors2.getDimension() + wordVectors3.getDimension();
+//        RealMatrix sentenceEmb = new Array2DRowRealMatrix(sentences.size(), dimension * 3);
+//
+//        for (int i = 0; i < sentences.size(); i++) {
+//            List<String> sentence = sentences.get(i);
+//            double[] avgEmb = new double[dimension];
+//            double[] maxEmb = new double[dimension];
+//            double[] minEmb = new double[dimension];
+//            for (int j = 0; j < minEmb.getDimension; j++) {
+//                maxEmb[j] = -Double.MAX_VALUE;
+//                minEmb[j] = Double.MAX_VALUE;
+//            }
+//            int count = 0;
+//            for (String term : sentence) {
+//                double[] vector1 = wordVectors1.get(term);
+//                double[] vector2 = wordVectors2.get(term);
+//                double[] vector3 = wordVectors3.get(term);
+//                if (vector1 == null && vector2 == null && vector3 == null) {
+//                    continue;
+//                }
+//
+//                if (vector1 == null) vector1 = new double[wordVectors1.getDimension()];
+//                if (vector2 == null) vector2 = new double[wordVectors2.getDimension()];
+//                if (vector3 == null) vector3 = new double[wordVectors3.getDimension()];
+//
+//                double[] termVector = NlpUtils.concat(vector1, vector2, vector3);
+//                if (termVector != null) {
+//                    double weight = wordWeights.getOrDefault(term, 1.0);
+//                    NlpUtils.selfMul(termVector, weight);
+//                    NlpUtils.selfAdd(avgEmb, termVector);
+//                    for (int j = 0; j < minEmb.getDimension; j++) {
+//                        if (termVector[j] > maxEmb[j]) {
+//                            maxEmb[j] = termVector[j];
+//                        }
+//                        if (termVector[j] < minEmb[j]) {
+//                            minEmb[j] = termVector[j];
+//                        }
+//                    }
+//                    ++count;
+//                }
+//            }
+//
+//            if (count == 0) {
+//                sentenceEmb.setRowMatrix(i, MatrixUtils.createRowRealMatrix(new double[dimension * 3]));
+//            } else {
+//                NlpUtils.selfMul(avgEmb, 1.0 / count);
+//                double[] result = NlpUtils.concat(maxEmb, avgEmb, minEmb);
+//                sentenceEmb.setRowMatrix(i, MatrixUtils.createRowRealMatrix(result));
+//            }
+//        }
+//        return sentenceEmb;
+//    }
+
     public RealMatrix getEnhancedEmbedding(List<List<String>> sentences) {
         if (!loadComplete) {
             throw new IllegalStateException("Sentence Embedding isn't initialized well");
@@ -104,63 +165,70 @@ public class PowerMeanEmb {
             return null;
         }
 
-        int dimension = wordVectors1.getDimension() + wordVectors2.getDimension() + wordVectors3.getDimension();
-        RealMatrix sentenceEmb = new Array2DRowRealMatrix(sentences.size(), dimension * 3);
+        int wordDimension = wordVectors3.getDimension();
+        RealMatrix sentenceEmb = new Array2DRowRealMatrix(sentences.size(), wordDimension * 3);
 
         for (int i = 0; i < sentences.size(); i++) {
             List<String> sentence = sentences.get(i);
-            double[] avgEmb = new double[dimension];
-            double[] maxEmb = new double[dimension];
-            double[] minEmb = new double[dimension];
-            for (int j = 0; j < minEmb.length; j++) {
-                maxEmb[j] = -Double.MAX_VALUE;
-                minEmb[j] = Double.MAX_VALUE;
+            // maxEmb + avgEmb + minEmb
+            double[] emb = new double[wordDimension * 3];
+            for (int j = 0; j < wordDimension; j++) {
+                emb[j] = -Double.MAX_VALUE;
+                emb[j + wordDimension * 2] = Double.MAX_VALUE;
             }
+
             int count = 0;
             for (String term : sentence) {
-                double[] vector1 = wordVectors1.get(term);
-                double[] vector2 = wordVectors2.get(term);
-                double[] vector3 = wordVectors3.get(term);
-                if (vector1 == null && vector2 == null && vector3 == null) {
-                    continue;
-                }
-
-                if (vector1 == null) vector1 = new double[wordVectors1.getDimension()];
-                if (vector2 == null) vector2 = new double[wordVectors2.getDimension()];
-                if (vector3 == null) vector3 = new double[wordVectors3.getDimension()];
-
-                double[] termVector = NlpUtils.concat(vector1, vector2, vector3);
-                if (termVector != null) {
-                    double weight = wordWeights.getOrDefault(term, 1.0);
-                    NlpUtils.selfMul(termVector, weight);
-                    NlpUtils.selfAdd(avgEmb, termVector);
-                    for (int j = 0; j < minEmb.length; j++) {
-                        if (termVector[j] > maxEmb[j]) {
-                            maxEmb[j] = termVector[j];
-                        }
-                        if (termVector[j] < minEmb[j]) {
-                            minEmb[j] = termVector[j];
+                double[] termVector = wordVectors3.get(term);
+                if (termVector == null) {
+                    boolean find = false;
+                    for (int j = 0; j < term.length(); j++) {
+                        String str = term.substring(j, j + 1);
+                        if (wordVectors3.hasWord(str)) {
+                            if (termVector == null) {
+                                termVector = new double[wordDimension];
+                            }
+                            find = true;
+                            double[] curVec = wordVectors3.get(str);
+                            for (int k = 0; k < curVec.length; k++) {
+                                termVector[k] += curVec[k];
+                            }
+                            ++count;
                         }
                     }
-                    ++count;
+                    if (!find) {
+                        continue;
+                    }
                 }
+                double weight = wordWeights.getOrDefault(term, 1.0);
+                for (int j = 0; j < wordDimension; j++) {
+                    emb[j + wordDimension] += termVector[j] * weight;
+                    if (termVector[j] > emb[j]) {
+                        emb[j] = termVector[j];
+                    }
+                    if (termVector[j] < emb[j + wordDimension * 2]) {
+                        emb[j + wordDimension * 2] = termVector[j];
+                    }
+                }
+                ++count;
             }
-
             if (count == 0) {
-                sentenceEmb.setRowMatrix(i, MatrixUtils.createRowRealMatrix(new double[dimension * 3]));
-            } else {
-                NlpUtils.selfMul(avgEmb, 1.0 / count);
-                double[] result = NlpUtils.concat(maxEmb, avgEmb, minEmb);
-                sentenceEmb.setRowMatrix(i, MatrixUtils.createRowRealMatrix(result));
+                sentenceEmb.setRowMatrix(i, MatrixUtils.createRowRealMatrix(new double[wordDimension * 3]));
+                continue;
             }
+            for (int j = 0; j < emb.length; j++) {
+                emb[j] /= count;
+            }
+            sentenceEmb.setRowMatrix(i, MatrixUtils.createRowRealMatrix(emb));
         }
+
         return sentenceEmb;
     }
 
     @Deprecated
     public void close() {
-        this.wordVectors1.clear();
-        this.wordVectors2.clear();
+//        this.wordVectors1.clear();
+//        this.wordVectors2.clear();
         this.wordVectors3.clear();
     }
 }

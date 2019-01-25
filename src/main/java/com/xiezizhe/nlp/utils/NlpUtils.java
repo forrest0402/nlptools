@@ -8,7 +8,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -115,5 +118,73 @@ public class NlpUtils {
                 logger.error("", e);
             }
         }
+    }
+
+    /**
+     * N-gram split and Jaccard distance
+     *
+     * @param str1
+     * @param str2
+     * @return
+     */
+    public static double stringDistance(String str1, String str2) {
+        if (str1 == null || str2 == null) {
+            return 0f;
+        }
+        if (str1 == str2) {
+            return 1.0;
+        }
+
+        List<String> ngram1 = generateNgramsUpto(str1, 3);
+        List<String> ngram2 = generateNgramsUpto(str2, 3);
+        return jaccardDistance(ngram1, ngram2);
+    }
+
+    /**
+     * @param str         should has at least one string
+     * @param maxGramSize should be 1 at least
+     * @return set of continuous word n-grams up to maxGramSize from the sentence
+     */
+    public static List<String> generateNgramsUpto(String str, int maxGramSize) {
+        List<String> sentence = new ArrayList<>();
+        for (char c : str.toCharArray()) {
+            sentence.add(String.valueOf(c));
+        }
+
+        List<String> ngrams = new ArrayList<>();
+        int ngramSize;
+        StringBuilder sb = null;
+
+        for (ListIterator<String> it = sentence.listIterator(); it.hasNext(); ) {
+            String word = it.next();
+
+            sb = new StringBuilder(word);
+            ngrams.add(word);
+            ngramSize = 1;
+            it.previous();
+
+            while (it.hasPrevious() && ngramSize < maxGramSize) {
+                //sb.insert(0, ' ');
+                sb.insert(0, it.previous());
+                ngrams.add(sb.toString());
+                ngramSize++;
+            }
+
+            while (ngramSize > 0) {
+                ngramSize--;
+                it.next();
+            }
+        }
+        return ngrams;
+    }
+
+    public static double jaccardDistance(List<? extends Object> T1, List<? extends Object> T2) {
+        Set<? extends Object> set1 = new HashSet<>(T1);
+        double numerator = 0, denominator = 0;
+        for (Object o : T2) {
+            if (set1.contains(o)) ++numerator;
+            else ++denominator;
+        }
+        return numerator / (denominator + T1.size());
     }
 }

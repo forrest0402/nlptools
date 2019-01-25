@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
  * Created by xiezizhe
  * Date: 2018/8/28 上午10:29
  */
-public class Entry<T> implements Serializable {
+public class Entry<T> implements Serializable, IEntry<T> {
 
     private static final long serialVersionUID = 733521108316381015L;
 
@@ -44,7 +44,7 @@ public class Entry<T> implements Serializable {
         return this.representation;
     }
 
-    public int length() {
+    public int getDimension() {
         return this.representation.length;
     }
 
@@ -66,10 +66,8 @@ public class Entry<T> implements Serializable {
 
     @Override
     public String toString() {
-        return "(" +
-                String.valueOf(data) + " " +
-                Arrays.stream(representation).mapToObj(String::valueOf).collect(Collectors.joining(" ")
-                ) + ")";
+        return String.valueOf(data) + " " +
+                Arrays.stream(representation).mapToObj(String::valueOf).collect(Collectors.joining(","));
     }
 
     @Override
@@ -84,4 +82,5 @@ public class Entry<T> implements Serializable {
     public int hashCode() {
         return Arrays.hashCode(representation);
     }
+
 }

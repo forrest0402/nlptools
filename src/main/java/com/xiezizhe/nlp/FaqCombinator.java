@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -52,18 +53,16 @@ public class FaqCombinator {
 
     public void run() throws IOException {
         String[] faqExcelFiles = environment.getProperty("faq.sources").split(",");
-        Map<String, List<String>> faqs = new ConcurrentHashMap<>();
+        Map<String, Set<String>> faqs = new ConcurrentHashMap<>();
         for (String faqExcelFile : faqExcelFiles) {
-            Map<String, List<String>> curFaq = excelUtils.getFaq(PREFIX + faqExcelFile)
-                    .entrySet().stream().filter(e -> e.getValue().size() > 5)
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            Map<String, Set<String>> curFaq = excelUtils.getFaq(PREFIX + faqExcelFile);
             faqs.putAll(curFaq);
         }
 
         // simple combine
         Map<String, String> queryToFaq = new HashMap<>();
         for (String key : faqs.keySet()) {
-            faqs.put(key, faqs.get(key).stream().distinct().filter(c -> c.length() > 2).collect(Collectors.toList()));
+            faqs.put(key, faqs.get(key).stream().distinct().filter(c -> c.length() > 2).collect(Collectors.toSet()));
             List<String> duplicateQueries = new ArrayList<>();
             for (String query : faqs.get(key)) {
                 if (queryToFaq.containsKey(key)) {
@@ -97,7 +96,7 @@ public class FaqCombinator {
         index.build(entries, -1);
 
         logger.info("3. filter faq");
-        Map<String, List<String>> finalFaq = new ConcurrentHashMap<>();
+        Map<String, Set<String>> finalFaq = new ConcurrentHashMap<>();
         faqs.remove("");
         List<String> keys = new ArrayList<>(faqs.keySet());
         ExecutorService threadPool = new ThreadPoolExecutor(5, 5, 60000,
@@ -115,11 +114,11 @@ public class FaqCombinator {
                     }
 
                     if (!flag) {
-                        List<String> simQuestions = faqs.get(key);
+                        Set<String> simQuestions = faqs.get(key);
 //                      int toIndex = Math.min(simQuestions.size(), 20);
                         int toIndex = simQuestions.size();
-                        Map<String, List<String>> candidates = batchQuery(key, simQuestions.subList(0, toIndex),
-                                index, 0.93, queryToFaq);
+                        Map<String, List<String>> candidates = batchQuery(key,
+                                new ArrayList<>(simQuestions).subList(0, toIndex), index, 0.93, queryToFaq);
                         try {
                             lock.lock();
                             finalFaq.put(key, simQuestions);

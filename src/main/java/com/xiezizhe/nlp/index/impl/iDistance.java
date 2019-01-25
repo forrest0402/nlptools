@@ -31,11 +31,11 @@ public class iDistance<T> implements Index<T>, Serializable {
 
     private static Logger logger = LoggerFactory.getLogger(iDistance.class);
 
-    private static final double DEFAULT_DELTA = 1.0;
+    private static final double DEFAULT_DELTA = 20;
 
     private static final double KMEANS_THRESHOLD = 1.0;
 
-    private static final int MAX_ROUNDS = 100;
+    private static final int MAX_ROUNDS = 10000;
 
     private static ThreadLocal<Boolean> stopFlags = new ThreadLocal<>();
 
@@ -50,11 +50,11 @@ public class iDistance<T> implements Index<T>, Serializable {
     public synchronized void build(List<Entry<T>> entries, int k) {
         if (ready) return;
         logger.info("building index - {}", entries.size());
-        if (k > entries.size()) throw new IllegalArgumentException("k is too large");
-        this.group = kMeans(entries, k);
-        if (logger.isDebugEnabled()) {
-            this.group.show();
+        if (!validate(entries, k)) {
+            throw new IllegalArgumentException("k is too large or entries are invalid");
         }
+        this.group = kMeans(entries, k);
+        this.group.show();
         ready = true;
         logger.info("building complete");
     }
@@ -93,7 +93,7 @@ public class iDistance<T> implements Index<T>, Serializable {
     private void searchO(Entry<T> query, double radius, PriorityQueue<Entry<T>> answers,
                          int k, boolean[] visit, int[] lp, int[] rp) {
 
-        if (answers.size() == k && answers.peek().getDist() <= radius) {
+        if (answers.size() == k && answers.peek().getScore() <= radius) {
             stopFlags.set(true);
         }
 
@@ -116,7 +116,7 @@ public class iDistance<T> implements Index<T>, Serializable {
             } else {
                 //continue the search process
                 lp[i] = searchInward(lp[i], dist, this.group.getGroup(i), query, radius, k, answers);
-                rp[i] = searchInward(rp[i], dist, this.group.getGroup(i), query, radius, k, answers);
+                rp[i] = searchOutward(rp[i], dist, this.group.getGroup(i), query, radius, k, answers);
             }
         }
     }
@@ -192,7 +192,6 @@ public class iDistance<T> implements Index<T>, Serializable {
     }
 
     private Group kMeans(List<Entry<T>> entries, int k) {
-
         Random random = new SecureRandom();
         final Entry<T>[] representatives = new Entry[k];
         final double[] dMax = new double[k];
@@ -206,9 +205,14 @@ public class iDistance<T> implements Index<T>, Serializable {
             representatives[i] = new Entry<>(entries.get(idx));
         }
 
+        representatives[0] = new Entry<>(entries.get(0));
+        representatives[1] = new Entry<>(entries.get(101));
+        representatives[2] = new Entry<>(entries.get(202));
+        representatives[3] = new Entry<>(entries.get(303));
+
         double preVariance = Double.MAX_VALUE;
         int round = 0;
-        while (preVariance > KMEANS_THRESHOLD || round++ < MAX_ROUNDS) {
+        while (++round < MAX_ROUNDS && preVariance > KMEANS_THRESHOLD) {
 
             groupMap = new HashMap<>();
             double variance = 0.0;
@@ -243,7 +247,7 @@ public class iDistance<T> implements Index<T>, Serializable {
             }
 
             variance /= entries.size();
-            if (preVariance - variance < preVariance * 0.001) break;
+//            if (preVariance - variance < preVariance * 0.001) break;
             preVariance = variance;
         }
 
@@ -253,14 +257,31 @@ public class iDistance<T> implements Index<T>, Serializable {
                 .getAsDouble()
         );
 
-        List<List<Entry<T>>> groups = new TreeMap<>(groupMap).values().stream().collect(Collectors.toList());
+        List<List<Entry<T>>> groups = new ArrayList<>(new TreeMap<>(groupMap).values());
         for (int i = 0; i < representatives.length; i++) {
             groups.get(i).add(0, representatives[i]);
+            for (Entry<T> entry : groups.get(i)) {
+                entry.setDist(dist(entry.getRepr(), representatives[i].getRepr()));
+            }
+            Collections.sort(groups.get(i), Comparator.comparingDouble(Entry::getDist));
         }
 
         return new Group(groups, representatives, dMax, entries.size());
     }
 
+
+    private boolean validate(List<Entry<T>> entries, int k) {
+        if (entries == null || entries.size() == 0 || k > entries.size()) {
+            return false;
+        }
+        int dimension = entries.get(0).getDimension();
+        for (Entry<T> entry : entries) {
+            if (dimension != entry.getDimension()) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     private class Group<T> implements Serializable {
 
@@ -271,7 +292,6 @@ public class iDistance<T> implements Index<T>, Serializable {
         private final Entry<T>[] representatives;
 
         private final double[] dMax;
-
 
         private final int candidateNumber;
 

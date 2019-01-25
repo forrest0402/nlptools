@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
- * In information theory, the Hamming distance between two strings of equal length is the number of positions at
+ * In information theory, the Hamming distance between two strings of equal getDimension is the number of positions at
  * which the corresponding symbols are different.
  * In other words, it measures the minimum number of substitutions required to change one string into the other
  * <p>

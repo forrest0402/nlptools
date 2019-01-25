@@ -73,7 +73,14 @@ public class WordVector {
         if (isClear) {
             throw new IllegalStateException("this word vectors had been cleared");
         }
-        return wordEmb.get(term);
+        if (wordEmb.containsKey(term)) {
+            return wordEmb.get(term).clone();
+        }
+        return null;
+    }
+
+    public boolean hasWord(String word) {
+        return this.wordEmb.containsKey(word);
     }
 
 }
