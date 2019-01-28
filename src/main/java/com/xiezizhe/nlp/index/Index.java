@@ -17,6 +17,8 @@ public interface Index<T> {
 
     void build(List<Entry<T>> entries, int k);
 
+    void setSeeds(List<double[]> seeds);
+
     List<Entry<T>> top(Entry<T> entry, int k);
 
     List<Entry<T>> top(Entry<T> entry, double threshold);

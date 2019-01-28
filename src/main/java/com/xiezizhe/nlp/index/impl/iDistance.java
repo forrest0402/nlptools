@@ -35,11 +35,13 @@ public class iDistance<T> implements Index<T>, Serializable {
 
     private static final double KMEANS_THRESHOLD = 1.0;
 
-    private static final int MAX_ROUNDS = 10000;
+    private static final int MAX_ROUNDS = 10;
 
     private static ThreadLocal<Boolean> stopFlags = new ThreadLocal<>();
 
     private Group group;
+
+    private List<double[]> seeds;
 
     private volatile boolean ready = false;
 
@@ -57,6 +59,11 @@ public class iDistance<T> implements Index<T>, Serializable {
         this.group.show();
         ready = true;
         logger.info("building complete");
+    }
+
+    @Override
+    public void setSeeds(List<double[]> seeds) {
+        this.seeds = seeds;
     }
 
     @Override
@@ -149,7 +156,7 @@ public class iDistance<T> implements Index<T>, Serializable {
         if (answers.size() > k) {
             answers.poll();
         }
-        if (candidateDist < radius) {
+        if (entries.get(left).getDist() > dist - radius) {
             return searchInward(left - 1, dist, entries, query, radius, k, answers);
         }
         return left - 1;
@@ -170,7 +177,7 @@ public class iDistance<T> implements Index<T>, Serializable {
         if (answers.size() > k) {
             answers.poll();
         }
-        if (candidateDist < radius) {
+        if (entries.get(right).getDist() < dist + radius) {
             return searchOutward(right + 1, dist, entries, query, radius, k, answers);
         }
         return right + 1;
@@ -197,19 +204,22 @@ public class iDistance<T> implements Index<T>, Serializable {
         final double[] dMax = new double[k];
         Map<Integer, List<Entry<T>>> groupMap = null;
 
-        boolean[] chosenIdx = new boolean[entries.size()];
-        for (int i = 0; i < representatives.length; i++) {
-            int idx = random.nextInt(entries.size());
-            while (chosenIdx[idx]) idx = random.nextInt(entries.size());
-            chosenIdx[idx] = true;
-            representatives[i] = new Entry<>(entries.get(idx));
+        if (this.seeds == null) {
+            boolean[] chosenIdx = new boolean[entries.size()];
+            for (int i = 0; i < representatives.length; i++) {
+                int idx = random.nextInt(entries.size());
+                while (chosenIdx[idx]) idx = random.nextInt(entries.size());
+                chosenIdx[idx] = true;
+                representatives[i] = new Entry<>(entries.get(idx));
+            }
+        } else {
+            if (this.seeds.size() != k) {
+                throw new IllegalStateException("seeds don't match k");
+            }
+            for (int i = 0; i < k; i++) {
+                representatives[i] = new Entry<T>(seeds.get(i), null);
+            }
         }
-
-        representatives[0] = new Entry<>(entries.get(0));
-        representatives[1] = new Entry<>(entries.get(101));
-        representatives[2] = new Entry<>(entries.get(202));
-        representatives[3] = new Entry<>(entries.get(303));
-
         double preVariance = Double.MAX_VALUE;
         int round = 0;
         while (++round < MAX_ROUNDS && preVariance > KMEANS_THRESHOLD) {

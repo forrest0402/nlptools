@@ -27,6 +27,11 @@ public class BruteForce<T> implements Index<T> {
     }
 
     @Override
+    public void setSeeds(List<double[]> seeds) {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
     public List<Entry<T>> top(Entry<T> entry, int k) {
 //        PriorityQueue<Entry<T>> results = new PriorityQueue<>(Comparator.comparing(Entry::getScore));
 //        for (Entry<T> candidate : entries) {
